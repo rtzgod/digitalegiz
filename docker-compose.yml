@@ -205,6 +205,9 @@ services:
         limits:
           memory: 32m
     restart: always
+    depends_on:
+      - gateway
+      - nginx
     logging:
       options:
         max-size: 10m

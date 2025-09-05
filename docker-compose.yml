@@ -1,0 +1,226 @@
+# =============================================================================
+# DIGITALEGIZ IOT PLATFORM - DOCKER COMPOSE CONFIGURATION
+# =============================================================================
+# Complete IoT platform with LoRaWAN network server, time-series database,
+# and visualization dashboard with Unity 3D panel support
+# =============================================================================
+
+services:
+
+# =============================================================================
+# CHIRPSTACK - LoRaWAN NETWORK SERVER STACK
+# =============================================================================
+# ChirpStack provides complete LoRaWAN network server functionality including
+# device management, gateway bridge, and REST API services
+
+  # Main ChirpStack Network Server
+  chirpstack:
+    image: chirpstack/chirpstack:4
+    container_name: digitalegiz-chirpstack
+    command: -c /etc/chirpstack
+    restart: unless-stopped
+    volumes:
+      - ./configuration/chirpstack:/etc/chirpstack
+    depends_on:
+      - postgres
+      - mosquitto
+      - redis
+    environment:
+      - MQTT_BROKER_HOST=${MQTT_BROKER_HOST}
+      - REDIS_HOST=${REDIS_HOST}
+      - POSTGRESQL_HOST=${POSTGRESQL_HOST}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - CHIRPSTACK_API_SECRET=${CHIRPSTACK_API_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - digitalegiz-network
+
+  # ChirpStack Gateway Bridge for packet forwarder protocol (UDP)
+  chirpstack-gateway-bridge:
+    image: chirpstack/chirpstack-gateway-bridge:4
+    container_name: digitalegiz-chirpstack-gateway-bridge
+    restart: unless-stopped
+    ports:
+      - "1700:1700/udp"
+    volumes:
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+    environment:
+      - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}
+      - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}
+      - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
+    depends_on:
+      - mosquitto
+    networks:
+      - digitalegiz-network
+  
+  # ChirpStack Gateway Bridge for BasicStation protocol (WebSocket)
+  chirpstack-gateway-bridge-basicstation:
+    image: chirpstack/chirpstack-gateway-bridge:4
+    container_name: digitalegiz-chirpstack-gateway-bridge-basicstation
+    restart: unless-stopped
+    command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-eu868.toml
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+    depends_on:
+      - mosquitto
+    networks:
+      - digitalegiz-network
+
+  # ChirpStack REST API for external integrations
+  chirpstack-rest-api:
+    image: chirpstack/chirpstack-rest-api:4
+    container_name: digitalegiz-chirpstack-rest-api
+    restart: unless-stopped
+    command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
+    ports:
+      - "8090:8090"
+    depends_on:
+      - chirpstack
+    networks:
+      - digitalegiz-network
+
+# =============================================================================
+# DATABASE SERVICES
+# =============================================================================
+# PostgreSQL for ChirpStack data storage and Redis for caching
+
+  # PostgreSQL Database for ChirpStack
+  postgres:
+    image: postgres:14-alpine
+    container_name: digitalegiz-postgres
+    restart: unless-stopped
+    volumes:
+      - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
+      - postgresqldata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - digitalegiz-network
+
+  # Redis Cache for ChirpStack
+  redis:
+    image: redis:7-alpine
+    container_name: digitalegiz-redis
+    restart: unless-stopped
+    command: redis-server --save 300 1 --save 60 100 --appendonly no
+    volumes:
+      - redisdata:/data
+    networks:
+      - digitalegiz-network
+
+# =============================================================================
+# MESSAGE BROKER
+# =============================================================================
+# MQTT broker for device communication and data routing
+
+  # Eclipse Mosquitto MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: digitalegiz-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes: 
+      - ./configuration/mosquitto/config/:/mosquitto/config/
+    networks:
+      - digitalegiz-network
+
+# =============================================================================
+# TIME-SERIES DATABASE & DATA COLLECTION
+# =============================================================================
+# InfluxDB for IoT data storage and Telegraf for data collection from MQTT
+
+  # InfluxDB Time-Series Database
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: digitalegiz-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdbdata:/var/lib/influxdb2
+      - ./configuration/influxdb:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    networks:
+      - digitalegiz-network
+
+  # Telegraf Data Collection Agent
+  telegraf:
+    image: telegraf:1.28-alpine
+    container_name: digitalegiz-telegraf
+    restart: unless-stopped
+    volumes:
+      - ./configuration/telegraf:/etc/telegraf
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=${INFLUXDB_ORG}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET}
+      - MQTT_BROKER_HOST=${MQTT_BROKER_HOST}
+    depends_on:
+      - influxdb
+      - mosquitto
+    networks:
+      - digitalegiz-network
+
+# =============================================================================
+# VISUALIZATION & DASHBOARDS
+# =============================================================================
+# Grafana with Unity 3D panel support for advanced IoT data visualization
+
+  # Grafana Dashboard with Unity Panel Plugin
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION}
+    container_name: digitalegiz-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./configuration/grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana-unity-plugin/dist:/var/lib/grafana/plugins/ertis-unity-panel
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=ertis-unity-panel
+      - GF_LOG_LEVEL=debug
+      - GF_LOG_FILTERS=plugin.ertis-unity-panel:debug
+      - GF_DATAPROXY_LOGGING=1
+    depends_on:
+      - influxdb
+    networks:
+      - digitalegiz-network
+
+# =============================================================================
+# PERSISTENT STORAGE VOLUMES
+# =============================================================================
+# Named volumes for data persistence across container restarts
+
+volumes:
+  postgresqldata:    # PostgreSQL database files
+  redisdata:         # Redis cache data
+  influxdbdata:      # InfluxDB time-series data
+  grafanadata:       # Grafana dashboards and settings
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+# Custom bridge network for secure inter-service communication
+
+networks:
+  digitalegiz-network:
+    driver: bridge

@@ -48,7 +48,7 @@ docker compose up -d
 - **Redis**: Caching layer 
 
 ## Architecture
-![architecture.png](Architecture)
+![alt text](https://github.com/rtzgod/digitalegiz/blob/main/architecture.png "Architecture")
 
 ## 🎯 Connect Your Gateway
 

@@ -47,6 +47,9 @@ docker compose up -d
 - **PostgreSQL**: ChirpStack configuration storage
 - **Redis**: Caching layer 
 
+## Architecture
+![architecture.png](Architecture)
+
 ## 🎯 Connect Your Gateway
 
 Point your LoRaWAN gateway to:

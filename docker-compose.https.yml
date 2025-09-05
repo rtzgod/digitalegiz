@@ -1,11 +1,49 @@
 # =============================================================================
-# DIGITALEGIZ IOT PLATFORM - BASIC HTTP SETUP
+# DIGITALEGIZ IOT PLATFORM - DOCKER COMPOSE CONFIGURATION
 # =============================================================================
 # Complete IoT platform with LoRaWAN network server, time-series database,
 # and visualization dashboard with Unity 3D panel support
 # =============================================================================
 
 services:
+
+# =============================================================================
+# REVERSE PROXY & SSL TERMINATION
+# =============================================================================
+# Traefik handles HTTPS, SSL certificates, and routing to backend services
+
+  # Traefik Reverse Proxy with Let's Encrypt
+  traefik:
+    image: traefik:v3.0
+    container_name: digitalegiz-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--global.sendanonymoususage=false"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
+      - "traefik.http.routers.traefik.middlewares=auth"
+    networks:
+      - digitalegiz-network
 
 # =============================================================================
 # CHIRPSTACK - LoRaWAN NETWORK SERVER STACK
@@ -33,8 +71,14 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - CHIRPSTACK_API_SECRET=${CHIRPSTACK_API_SECRET}
-    ports:
-      - "8080:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chirpstack.rule=Host(`${DOMAIN}`) && PathPrefix(`/chirpstack`)"
+      - "traefik.http.routers.chirpstack.tls=true"
+      - "traefik.http.routers.chirpstack.tls.certresolver=letsencrypt"
+      - "traefik.http.services.chirpstack.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.chirpstack-stripprefix.stripprefix.prefixes=/chirpstack"
+      - "traefik.http.routers.chirpstack.middlewares=chirpstack-stripprefix"
     networks:
       - digitalegiz-network
 
@@ -77,10 +121,14 @@ services:
     container_name: digitalegiz-chirpstack-rest-api
     restart: unless-stopped
     command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
-    ports:
-      - "8090:8090"
     depends_on:
       - chirpstack
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chirpstack-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.chirpstack-api.tls=true"
+      - "traefik.http.routers.chirpstack-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.chirpstack-api.loadbalancer.server.port=8090"
     networks:
       - digitalegiz-network
 
@@ -143,8 +191,6 @@ services:
     image: influxdb:2.7-alpine
     container_name: digitalegiz-influxdb
     restart: unless-stopped
-    ports:
-      - "8086:8086"
     volumes:
       - influxdbdata:/var/lib/influxdb2
       - ./configuration/influxdb:/etc/influxdb2
@@ -155,6 +201,14 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.influxdb.rule=Host(`${DOMAIN}`) && PathPrefix(`/influxdb`)"
+      - "traefik.http.routers.influxdb.tls=true"
+      - "traefik.http.routers.influxdb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
+      - "traefik.http.middlewares.influxdb-stripprefix.stripprefix.prefixes=/influxdb"
+      - "traefik.http.routers.influxdb.middlewares=influxdb-stripprefix"
     networks:
       - digitalegiz-network
 
@@ -187,8 +241,6 @@ services:
     image: grafana/grafana:${GRAFANA_VERSION}
     container_name: digitalegiz-grafana
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     volumes:
       - grafanadata:/var/lib/grafana
       - ./configuration/grafana/provisioning:/etc/grafana/provisioning
@@ -200,6 +252,14 @@ services:
       - GF_LOG_LEVEL=debug
       - GF_LOG_FILTERS=plugin.ertis-unity-panel:debug
       - GF_DATAPROXY_LOGGING=1
+      - GF_SERVER_ROOT_URL=https://${DOMAIN}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`${DOMAIN}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     depends_on:
       - influxdb
     networks:
@@ -215,6 +275,7 @@ volumes:
   redisdata:         # Redis cache data
   influxdbdata:      # InfluxDB time-series data
   grafanadata:       # Grafana dashboards and settings
+  letsencrypt:       # Let's Encrypt SSL certificates
 
 # =============================================================================
 # NETWORK CONFIGURATION

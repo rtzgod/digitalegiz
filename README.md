@@ -2,34 +2,44 @@
 
 **🐳 Containerized IoT Platform** - Complete LoRaWAN Network Server with time-series database and 3D visualization dashboard.
 
-## 🚀 Deploy with Docker (2 Commands)
+## 🚀 Deploy with Docker
 
 ### Prerequisites
 - **Docker** and **Docker Compose** installed
 - **8GB+ RAM** recommended
 
-### 1. Clone & Deploy
+### Option 1: Basic HTTP Setup (Recommended)
 ```bash
 git clone <repository-url> digitalegiz && cd digitalegiz
 docker compose up -d
 ```
 
-### 2. Verify (Optional)
+### Option 2: HTTPS with SSL (Advanced)
 ```bash
-# Test all services
-./scripts/test-chirpstack.sh && ./scripts/test-telegraf-influx.sh
+git clone <repository-url> digitalegiz && cd digitalegiz
+./scripts/setup-https.sh
+docker compose -f docker-compose.https.yml up -d
 ```
 
-**🎉 Done!** Your IoT platform is running.
+**🎉 Done!** Your IoT platform is running!
 
 ## 🌐 Access Your Platform
 
+### Basic HTTP URLs (Default)
 | Service | URL | Login |
 |---------|-----|--------|
 | **🏠 ChirpStack** | http://localhost:8080 | admin / admin |
 | **📊 Grafana** | http://localhost:3000 | admin / digitalegiz2025 |
 | **📈 InfluxDB** | http://localhost:8086 | admin / digitalegiz2025 |
 | **🔌 REST API** | http://localhost:8090 | - |
+
+### HTTPS URLs (docker-compose.https.yml)
+| Service | URL | Login |
+|---------|-----|--------|
+| **🏠 ChirpStack** | https://your-domain/chirpstack | admin / admin |
+| **📊 Grafana** | https://your-domain/grafana | admin / digitalegiz2025 |
+| **📈 InfluxDB** | https://your-domain/influxdb | admin / digitalegiz2025 |
+| **🔧 Traefik** | https://your-domain/dashboard | admin / [generated] |
 
 ## 🏗️ What's Included (7 Services)
 
@@ -77,15 +87,34 @@ open http://localhost:3000  # admin/digitalegiz2025
 
 ## 🐳 Docker Management
 
+### Basic HTTP Setup
+```bash
+# Start platform
+docker compose up -d
+
+# Stop platform  
+docker compose down
+
+# View logs
+docker compose logs -f [service-name]
+```
+
+### HTTPS Setup
+```bash
+# Start HTTPS platform
+docker compose -f docker-compose.https.yml up -d
+
+# Stop HTTPS platform
+docker compose -f docker-compose.https.yml down
+
+# View logs
+docker compose -f docker-compose.https.yml logs -f [service-name]
+```
+
+### General Commands
 ```bash
 # View running services
 docker compose ps
-
-# View logs  
-docker compose logs -f [service-name]
-
-# Stop platform
-docker compose down
 
 # Restart service
 docker compose restart [service-name]
@@ -93,6 +122,23 @@ docker compose restart [service-name]
 # Test services
 ./scripts/test-chirpstack.sh
 ```
+
+## 📋 Deployment Options
+
+### `docker-compose.yml` (Default - HTTP)
+- ✅ **Simple setup** - Just run `docker compose up -d`
+- ✅ **Direct port access** - localhost:8080, :3000, :8086
+- ✅ **No domain required** - Works on any server
+- ✅ **Perfect for development** and internal networks
+- ❌ No encryption - HTTP only
+
+### `docker-compose.https.yml` (Advanced - HTTPS)  
+- ✅ **SSL encryption** with automatic Let's Encrypt certificates
+- ✅ **Reverse proxy** with Traefik dashboard
+- ✅ **Production ready** with security features
+- ✅ **Single domain** access with path-based routing
+- ❌ **Requires domain name** - IP addresses don't work with SSL
+- ❌ **More complex** setup and troubleshooting
 
 ## ❗ Troubleshooting
 

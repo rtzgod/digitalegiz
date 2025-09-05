@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/master/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Unity",
+  "id": "ertis-unity-panel",
+  "info": {
+    "description": "Unity WebGL render in Grafana panel",
+    "author": {
+      "name": "ERTIS",
+      "url": "https://ertis.uma.es/"
+    },
+    "keywords": [
+      "unity",
+      "3D",
+      "webGL"
+    ],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "Website",
+        "url": "https://github.com/grafana/grafana-starter-panel"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/grafana/grafana-starter-panel/blob/master/LICENSE"
+      }
+    ],
+    "screenshots": [],
+    "version": "1.0.0",
+    "updated": "2025-09-05"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=7.0.0",
+    "plugins": []
+  }
+}

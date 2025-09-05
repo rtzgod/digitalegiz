@@ -192,7 +192,7 @@ services:
     volumes:
       - grafanadata:/var/lib/grafana
       - ./configuration/grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana-unity-plugin/dist:/var/lib/grafana/plugins/ertis-unity-panel
+      - ./unity-plugin:/var/lib/grafana/plugins/ertis-unity-panel
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}

@@ -8,6 +8,16 @@ volumes/
 *.log
 logs/
 
+# Configuration files with secrets/tokens
+configuration/influxdb/influx-configs
+configuration/grafana/provisioning/datasources/influxdb.yml
+
+# SSL certificates and keys
+*.key
+*.pem
+*.crt
+*.p12
+
 # OS generated files
 .DS_Store
 Thumbs.db

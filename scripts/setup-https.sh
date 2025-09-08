@@ -153,7 +153,7 @@ generate_secure_password() {
 
 generate_traefik_hash() {
     local password="$1"
-    echo -n "$password" | htpasswd -niB admin | cut -d: -f2 | sed 's/\$/\\$/g'
+    echo -n "$password" | htpasswd -niB admin | cut -d: -f2 | sed 's/\$/\$\$/g'
 }
 
 get_secure_password() {

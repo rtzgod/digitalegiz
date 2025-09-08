@@ -285,7 +285,8 @@ main() {
     
     # Get Traefik password
     print_step "Setting up Traefik dashboard credentials..."
-    local traefik_password=$(get_secure_password)
+    local traefik_password=""
+    get_user_input "Enter Traefik dashboard password (min 8 chars)" traefik_password validate_password
     local traefik_hash=$(generate_traefik_hash "$traefik_password")
     print_success "Traefik credentials configured"
     

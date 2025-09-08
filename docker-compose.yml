@@ -71,19 +71,6 @@ services:
     networks:
       - digitalegiz-network
 
-  # ChirpStack REST API for external integrations
-  chirpstack-rest-api:
-    image: chirpstack/chirpstack-rest-api:4
-    container_name: digitalegiz-chirpstack-rest-api
-    restart: unless-stopped
-    command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
-    ports:
-      - "8090:8090"
-    depends_on:
-      - chirpstack
-    networks:
-      - digitalegiz-network
-
 # =============================================================================
 # DATABASE SERVICES
 # =============================================================================
@@ -147,7 +134,7 @@ services:
       - "8086:8086"
     volumes:
       - influxdbdata:/var/lib/influxdb2
-      - ./configuration/influxdb:/etc/influxdb2
+      - influxdbconfig:/etc/influxdb2
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER}
@@ -215,6 +202,7 @@ volumes:
   postgresqldata:    # PostgreSQL database files
   redisdata:         # Redis cache data
   influxdbdata:      # InfluxDB time-series data
+  influxdbconfig:
   grafanadata:       # Grafana dashboards and settings
 
 # =============================================================================

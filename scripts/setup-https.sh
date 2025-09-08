@@ -161,17 +161,15 @@ get_secure_password() {
     local confirm_password=""
     
     while true; do
-        echo -n -e "${CYAN}Enter Traefik dashboard password (min 8 chars)${NC}: "
-        read -s password
-        echo
+        echo -e "${CYAN}Enter Traefik dashboard password (min 8 chars)${NC}: "
+        read -r password
         
         if ! validate_password "$password"; then
             continue
         fi
         
-        echo -n -e "${CYAN}Confirm password${NC}: "
-        read -s confirm_password
-        echo
+        echo -e "${CYAN}Confirm password${NC}: "
+        read -r confirm_password
         
         if [ "$password" = "$confirm_password" ]; then
             echo "$password"

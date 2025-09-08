@@ -34,6 +34,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - letsencrypt:/letsencrypt
+    depends_on:
+      - chirpstack
+      - grafana
+      - influxdb
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
@@ -202,7 +206,7 @@ services:
       - DOCKER_INFLUXDB_INIT_CLI_CONFIG_NAME=digitalegiz
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.influxdb.rule=Host(`influxdb.${DOMAIN}`)"
+      - "traefik.http.routers.influxdb.rule=Host(`influx.${DOMAIN}`)"
       - "traefik.http.routers.influxdb.tls=true"
       - "traefik.http.routers.influxdb.tls.certresolver=letsencrypt"
       - "traefik.http.services.influxdb.loadbalancer.server.port=8086"

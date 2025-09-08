@@ -73,12 +73,10 @@ services:
       - CHIRPSTACK_API_SECRET=${CHIRPSTACK_API_SECRET}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.chirpstack.rule=Host(`${DOMAIN}`) && PathPrefix(`/chirpstack`)"
+      - "traefik.http.routers.chirpstack.rule=Host(`chirpstack.${DOMAIN}`)"
       - "traefik.http.routers.chirpstack.tls=true"
       - "traefik.http.routers.chirpstack.tls.certresolver=letsencrypt"
       - "traefik.http.services.chirpstack.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.chirpstack-stripprefix.stripprefix.prefixes=/chirpstack"
-      - "traefik.http.routers.chirpstack.middlewares=chirpstack-stripprefix"
     networks:
       - digitalegiz-network
 
@@ -204,12 +202,10 @@ services:
       - DOCKER_INFLUXDB_INIT_CLI_CONFIG_NAME=digitalegiz
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.influxdb.rule=Host(`${DOMAIN}`) && PathPrefix(`/influxdb`)"
+      - "traefik.http.routers.influxdb.rule=Host(`influxdb.${DOMAIN}`)"
       - "traefik.http.routers.influxdb.tls=true"
       - "traefik.http.routers.influxdb.tls.certresolver=letsencrypt"
       - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
-      - "traefik.http.middlewares.influxdb-stripprefix.stripprefix.prefixes=/influxdb"
-      - "traefik.http.routers.influxdb.middlewares=influxdb-stripprefix"
     networks:
       - digitalegiz-network
 
@@ -253,11 +249,10 @@ services:
       - GF_LOG_LEVEL=debug
       - GF_LOG_FILTERS=plugin.ertis-unity-panel:debug
       - GF_DATAPROXY_LOGGING=1
-      - GF_SERVER_ROOT_URL=https://${DOMAIN}/grafana
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`${DOMAIN}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"

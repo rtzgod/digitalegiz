@@ -86,6 +86,18 @@ generate_password() {
     openssl rand -base64 32 | tr -dc "$charset" | head -c "$length"
 }
 
+update_env_variable() {
+    local file="$1"
+    local var_name="$2"
+    local new_value="$3"
+    
+    # Use awk for safe replacement
+    awk -v var="$var_name" -v val="$new_value" '
+        $0 ~ "^" var "=" { print var "=" val; next }
+        { print }
+    ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+}
+
 generate_token() {
     local length="${1:-32}"
     openssl rand -hex "$length"
@@ -113,12 +125,12 @@ update_passwords() {
     local temp_file=$(mktemp)
     cp "$ENV_FILE" "$temp_file"
     
-    # Update passwords (excluding TRAEFIK_AUTH)
-    sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${postgres_password}/" "$temp_file"
-    sed -i "s/^INFLUXDB_PASSWORD=.*/INFLUXDB_PASSWORD=${influxdb_password}/" "$temp_file"
-    sed -i "s/^GRAFANA_PASSWORD=.*/GRAFANA_PASSWORD=${grafana_password}/" "$temp_file"
-    sed -i "s/^CHIRPSTACK_API_SECRET=.*/CHIRPSTACK_API_SECRET=${chirpstack_secret}/" "$temp_file"
-    sed -i "s/^INFLUXDB_TOKEN=.*/INFLUXDB_TOKEN=${influxdb_token}/" "$temp_file"
+    # Update passwords using awk (safer than sed for special characters)
+    update_env_variable "$temp_file" "POSTGRES_PASSWORD" "$postgres_password"
+    update_env_variable "$temp_file" "INFLUXDB_PASSWORD" "$influxdb_password"
+    update_env_variable "$temp_file" "GRAFANA_PASSWORD" "$grafana_password"
+    update_env_variable "$temp_file" "CHIRPSTACK_API_SECRET" "$chirpstack_secret"
+    update_env_variable "$temp_file" "INFLUXDB_TOKEN" "$influxdb_token"
     
     # Move temp file to final location
     mv "$temp_file" "$ENV_FILE"

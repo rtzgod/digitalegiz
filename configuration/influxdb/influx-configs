@@ -2,6 +2,12 @@
   url = "http://localhost:8086"
   token = "digitalegiz-influxdb-token-2025-secure"
   org = "digitalegiz"
+  previous = true
+
+[digitalegiz]
+  url = "http://localhost:8086"
+  token = "3964ca89c91f68428e8203c8b17cc11cc13f4b232009a868128507e9d0ae5912"
+  org = "digitalegiz"
   active = true
 # 
 # [eu-central]

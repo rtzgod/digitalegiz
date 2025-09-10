@@ -14,40 +14,45 @@ services:
 
   # Traefik Reverse Proxy with Let's Encrypt
   traefik:
-    image: traefik:v3.0
-    container_name: digitalegiz-traefik
-    restart: unless-stopped
-    command:
-      - "--api.dashboard=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--global.sendanonymoususage=false"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - letsencrypt:/letsencrypt
-    depends_on:
-      - chirpstack
-      - grafana
-      - influxdb
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
-      - "traefik.http.routers.traefik.tls=true"
-      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
-      - "traefik.http.routers.traefik.middlewares=auth"
-    networks:
-      - digitalegiz-network
+      image: traefik:v3.0
+      container_name: digitalegiz-traefik
+      restart: unless-stopped
+      command:
+        - "--api.dashboard=true"
+        - "--providers.docker=true"
+        - "--providers.docker.exposedbydefault=false"
+        - "--entrypoints.web.address=:80"
+        - "--entrypoints.websecure.address=:443"
+        - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+        - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+        - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+        - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+        - "--global.sendanonymoususage=false"
+      ports:
+        - "80:80"
+        - "443:443"
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock:ro
+        - letsencrypt:/letsencrypt
+      depends_on:
+        - chirpstack
+        - grafana
+        - influxdb
+      labels:
+        - "traefik.enable=true"
+        # Роутер для API и Dashboard
+        - "traefik.http.routers.traefik.rule=Host(`${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+        - "traefik.http.routers.traefik.tls=true"
+        - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.traefik.service=api@internal"
+        # Middlewares
+        - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
+        - "traefik.http.middlewares.dashboard-redirect.redirectregex.regex=^https?://${DOMAIN}/dashboard$$"
+        - "traefik.http.middlewares.dashboard-redirect.redirectregex.replacement=https://${DOMAIN}/dashboard/"
+        # Применяем оба middleware
+        - "traefik.http.routers.traefik.middlewares=dashboard-redirect,auth"
+      networks:
+        - digitalegiz-network
 
 # =============================================================================
 # CHIRPSTACK - LoRaWAN NETWORK SERVER STACK

@@ -153,7 +153,8 @@ generate_secure_password() {
 
 generate_traefik_hash() {
     local password="$1"
-    echo -n "$password" | htpasswd -niB admin | cut -d: -f2 | sed 's/\$/\$\$/g'
+    # Генерируем полную строку admin:hash и экранируем $ для docker-compose
+    echo -n "$password" | htpasswd -niB admin | sed 's/\$/\$\$/g'
 }
 
 get_secure_password() {
@@ -194,7 +195,8 @@ update_env_file() {
     # Update configurations
     sed -i "s/^DOMAIN=.*/DOMAIN=${domain}/" "$temp_file"
     sed -i "s/^LETSENCRYPT_EMAIL=.*/LETSENCRYPT_EMAIL=${email}/" "$temp_file"
-    sed -i "s|^TRAEFIK_AUTH=.*|TRAEFIK_AUTH=admin:${traefik_hash}|" "$temp_file"
+    # Изменено: убираем "admin:" так как он уже есть в хеше
+    sed -i "s|^TRAEFIK_AUTH=.*|TRAEFIK_AUTH=${traefik_hash}|" "$temp_file"
     
     # Move temp file to final location
     mv "$temp_file" "$ENV_FILE"

@@ -1,151 +1,259 @@
-# =============================================================================
-# ECLIPSE DITTO - DIGITAL TWIN PLATFORM
-# =============================================================================
-# Standalone Ditto deployment integrated with DigitalEgiz
-# Based on official Eclipse Ditto deployment
-# =============================================================================
-
-version: '3.8'
+# Copyright (c) 2019 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0
+#
+# SPDX-License-Identifier: EPL-2.0
 
 services:
-
-  # MongoDB Database for Ditto
   mongodb:
-    image: mongo:7.0
-    container_name: digitalegiz-mongodb
-    restart: unless-stopped
-    hostname: mongodb
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-    volumes:
-      - mongodata:/data/db
+    image: docker.io/mongo:7.0
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: always
     networks:
-      - digitalegiz-network
+      default:
+        aliases:
+          - mongodb
+    command: mongod --storageEngine wiredTiger --noscripting
+    user: mongodb
+    ports:
+      - 27017:27017
+    environment:
+       TZ: Europe/Berlin
+    logging:
+      options:
+        max-size: 50m
 
-  # Ditto Policies Service
-  ditto-policies:
-    image: eclipse/ditto-policies:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-policies
-    hostname: policies
-    restart: unless-stopped
-    environment:
-      - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/policies
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx256m
-    depends_on:
-      - mongodb
+  policies:
+    image: docker.io/eclipse/ditto-policies:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: always
     networks:
-      digitalegiz-network:
+      default:
         aliases:
           - ditto-cluster
-
-  # Ditto Things Service
-  ditto-things:
-    image: eclipse/ditto-things:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-things
-    hostname: things
-    restart: unless-stopped
     environment:
-      - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/things
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx256m
-    depends_on:
-      - mongodb
-      - ditto-policies
+      - TZ=Europe/Berlin
+      - BIND_HOSTNAME=0.0.0.0
+      # Set additional configuration options here appending JAVA_TOOL_OPTIONS: -Dditto.policies...
+      - JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -XX:+UseStringDeduplication -Xss512k -XX:MaxRAMPercentage=50 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -Dpekko.coordinated-shutdown.exit-jvm=on -Dpekko.cluster.shutdown-after-unsuccessful-join-seed-nodes=180s -Dpekko.cluster.failure-detector.threshold=15.0 -Dpekko.cluster.failure-detector.expected-response-after=10s -Dpekko.cluster.failure-detector.acceptable-heartbeat-pause=20s -Dpekko.cluster.downing-provider-class=
+      - MONGO_DB_HOSTNAME=mongodb
+      # in order to write logs into a file you can enable this by setting the following env variable
+      # the log file(s) can be found in /var/log/ditto directory on the host machine
+      # - DITTO_LOGGING_FILE_APPENDER=true
+    # only needed if DITTO_LOGGING_FILE_APPENDER is set
+    # volumes:
+    #  - ditto_log_files:/var/log/ditto
+    healthcheck:
+      test: curl --fail `hostname`:7626/alive || exit 1
+      interval: 30s
+      timeout: 15s
+      retries: 4
+      start_period: 120s
+    logging:
+      options:
+        max-size: 50m
+        
+  things:
+    image: docker.io/eclipse/ditto-things:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: always
     networks:
-      digitalegiz-network:
+      default:
         aliases:
           - ditto-cluster
-
-  # Ditto Things Search Service
-  ditto-things-search:
-    image: eclipse/ditto-things-search:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-things-search
-    hostname: things-search
-    restart: unless-stopped
-    environment:
-      - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/searchDB
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
     depends_on:
-      - mongodb
-      - ditto-policies
-      - ditto-things
+      - policies
+    environment:
+      - TZ=Europe/Berlin
+      - BIND_HOSTNAME=0.0.0.0
+      # Set additional configuration options here appending JAVA_TOOL_OPTIONS: -Dditto.things...
+      - JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -XX:+UseStringDeduplication -Xss512k -XX:MaxRAMPercentage=50 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -Dpekko.coordinated-shutdown.exit-jvm=on -Dpekko.cluster.shutdown-after-unsuccessful-join-seed-nodes=180s -Dpekko.cluster.failure-detector.threshold=15.0 -Dpekko.cluster.failure-detector.expected-response-after=10s -Dpekko.cluster.failure-detector.acceptable-heartbeat-pause=20s -Dpekko.cluster.downing-provider-class=
+      - MONGO_DB_HOSTNAME=mongodb
+      # in order to write logs into a file you can enable this by setting the following env variable
+      # the log file(s) can be found in /var/log/ditto directory on the host machine
+      # - DITTO_LOGGING_FILE_APPENDER=true
+    # only needed if DITTO_LOGGING_FILE_APPENDER is set
+    # volumes:
+    #  - ditto_log_files:/var/log/ditto
+    healthcheck:
+      test: curl --fail `hostname`:7626/alive || exit 1
+      interval: 30s
+      timeout: 15s
+      retries: 4
+      start_period: 120s
+    logging:
+      options:
+        max-size: 50m
+        
+  things-search:
+    image: docker.io/eclipse/ditto-things-search:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: always
     networks:
-      digitalegiz-network:
+      default:
         aliases:
           - ditto-cluster
-
-  # Ditto Connectivity Service (MQTT Integration)
-  ditto-connectivity:
-    image: eclipse/ditto-connectivity:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-connectivity
-    hostname: connectivity
-    restart: unless-stopped
-    environment:
-      - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/connectivity
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
     depends_on:
-      - mongodb
-      - ditto-policies
-      - ditto-things
+      - policies
+    environment:
+      - TZ=Europe/Berlin
+      - BIND_HOSTNAME=0.0.0.0
+      # Set additional configuration options here appending JAVA_TOOL_OPTIONS: -Dditto.search...
+      - JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -XX:+UseStringDeduplication -Xss512k -XX:MaxRAMPercentage=50 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -Dpekko.coordinated-shutdown.exit-jvm=on -Dpekko.cluster.shutdown-after-unsuccessful-join-seed-nodes=180s -Dpekko.cluster.failure-detector.threshold=15.0 -Dpekko.cluster.failure-detector.expected-response-after=10s -Dpekko.cluster.failure-detector.acceptable-heartbeat-pause=20s -Dpekko.cluster.downing-provider-class=
+      - MONGO_DB_HOSTNAME=mongodb
+      # in order to write logs into a file you can enable this by setting the following env variable
+      # the log file(s) can be found in /var/log/ditto directory on the host machine
+      # - DITTO_LOGGING_FILE_APPENDER=true
+    # only needed if DITTO_LOGGING_FILE_APPENDER is set
+    # volumes:
+    #  - ditto_log_files:/var/log/ditto
+    healthcheck:
+      test: curl --fail `hostname`:7626/alive || exit 1
+      interval: 30s
+      timeout: 15s
+      retries: 4
+      start_period: 120s
+    logging:
+      options:
+        max-size: 50m
+        
+  connectivity:
+    image: docker.io/eclipse/ditto-connectivity:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    restart: always
     networks:
-      digitalegiz-network:
+      default:
         aliases:
           - ditto-cluster
-
-  # Ditto Gateway Service (API Entry Point)
-  ditto-gateway:
-    image: eclipse/ditto-gateway:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-gateway
-    hostname: gateway
-    restart: unless-stopped
+    depends_on:
+      - policies
     environment:
-      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
-      - DEVOPS_PASSWORD=${DITTO_DEVOPS_PASSWORD}
+      - TZ=Europe/Berlin
+      - BIND_HOSTNAME=0.0.0.0
+      # if connections to rabbitmq broker are used, you might want to disable ExitOnOutOfMemoryError, because the amqp-client has a bug throwing OOM exceptions and causing a restart loop
+      # Set additional configuration options here appending JAVA_TOOL_OPTIONS: -Dditto.connectivity...
+      - JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -XX:+UseStringDeduplication -Xss512k -XX:MaxRAMPercentage=50 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -Dpekko.coordinated-shutdown.exit-jvm=on -Dpekko.cluster.shutdown-after-unsuccessful-join-seed-nodes=180s -Dpekko.cluster.failure-detector.threshold=15.0 -Dpekko.cluster.failure-detector.expected-response-after=10s -Dpekko.cluster.failure-detector.acceptable-heartbeat-pause=20s -Dpekko.cluster.downing-provider-class=
+      - MONGO_DB_HOSTNAME=mongodb
+      # in order to write logs into a file you can enable this by setting the following env variable
+      # the log file(s) can be found in /var/log/ditto directory on the host machine
+      # - DITTO_LOGGING_FILE_APPENDER=true
+    # only needed if DITTO_LOGGING_FILE_APPENDER is set
+    #volumes:
+    #  - ditto_log_files:/var/log/ditto
+    healthcheck:
+      test: curl --fail `hostname`:7626/alive || exit 1
+      interval: 30s
+      timeout: 15s
+      retries: 4
+      start_period: 120s
+    logging:
+      options:
+        max-size: 50m
+        
+  gateway:
+    image: docker.io/eclipse/ditto-gateway:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: always
+    networks:
+      default:
+        aliases:
+          - ditto-cluster
+    depends_on:
+      - policies
+    environment:
+      - TZ=Europe/Berlin
+      - BIND_HOSTNAME=0.0.0.0
       - ENABLE_PRE_AUTHENTICATION=true
-    depends_on:
-      - ditto-policies
-      - ditto-things
-      - ditto-things-search
-      - ditto-connectivity
-    networks:
-      digitalegiz-network:
-        aliases:
-          - ditto-cluster
-
-  # Ditto UI (Web Interface)
+      # Set additional configuration options here appending JAVA_TOOL_OPTIONS: -Dditto.gateway.authentication.devops.password=foobar -Dditto.gateway...
+      - JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -XX:+UseStringDeduplication -Xss512k -XX:MaxRAMPercentage=50 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -Dpekko.coordinated-shutdown.exit-jvm=on -Dpekko.cluster.shutdown-after-unsuccessful-join-seed-nodes=180s -Dpekko.cluster.failure-detector.threshold=15.0 -Dpekko.cluster.failure-detector.expected-response-after=10s -Dpekko.cluster.failure-detector.acceptable-heartbeat-pause=20s -Dpekko.cluster.downing-provider-class=
+      # in order to write logs into a file you can enable this by setting the following env variable
+      # the log file(s) can be found in /var/log/ditto directory on the host machine
+      # - DITTO_LOGGING_FILE_APPENDER=true
+      # You may use the environment for setting the devops password
+      #- DEVOPS_PASSWORD=foobar
+    # only needed if DITTO_LOGGING_FILE_APPENDER is set
+    # volumes:
+    #  - ditto_log_files:/var/log/ditto
+    healthcheck:
+      test: curl --fail `hostname`:7626/alive || exit 1
+      interval: 30s
+      timeout: 15s
+      retries: 4
+      start_period: 120s
+    logging:
+      options:
+        max-size: 50m
+        
   ditto-ui:
-    image: eclipse/ditto-ui:${DITTO_VERSION}
-    container_name: digitalegiz-ditto-ui
-    hostname: ditto-ui
-    restart: unless-stopped
-    networks:
-      - digitalegiz-network
-
-  # Nginx Reverse Proxy for Ditto
-  ditto-nginx:
-    image: nginx:1.27-alpine
+    image: docker.io/eclipse/ditto-ui:${DITTO_VERSION:-latest}
+    deploy:
+      resources:
+        limits:
+          memory: 32m
+    restart: always
+    logging:
+      options:
+        max-size: 10m
+        
+  nginx:
+    image: docker.io/nginx:1.27-alpine
     container_name: digitalegiz-ditto-nginx
-    hostname: ditto-nginx
-    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32m
+    restart: always
     volumes:
-      - ./configuration/ditto/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./configuration/ditto/nginx.htpasswd:/etc/nginx/nginx.htpasswd:ro
-      - ./configuration/ditto/nginx-cors.conf:/etc/nginx/nginx-cors.conf:ro
+       - ./configuration/ditto/nginx.conf:/etc/nginx/nginx.conf:ro
+       - ./configuration/ditto/nginx.htpasswd:/etc/nginx/nginx.htpasswd:ro
+       - ./configuration/ditto/nginx-cors.conf:/etc/nginx/nginx-cors.conf:ro
     depends_on:
-      - ditto-gateway
+      - gateway
       - ditto-ui
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ditto.rule=Host(`ditto.${DOMAIN}`)"
       - "traefik.http.routers.ditto.tls=true"
       - "traefik.http.routers.ditto.tls.certresolver=letsencrypt"
-      - "traefik.http.services.ditto.loadbalancer.server.port=8080"
+      - "traefik.http.services.ditto.loadbalancer.server.port=80"
     networks:
-      - digitalegiz-network
-
+      - default
+      - digitalegiz_digitalegiz-network
+    logging:
+      options:
+        max-size: 10m
+        
 volumes:
-  mongodata:
+  ditto_log_files:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/log/ditto
+      o: bind,uid=1000,gid=1000
 
 networks:
-  digitalegiz-network:
+  digitalegiz_digitalegiz-network:
     external: true

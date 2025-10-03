@@ -1,85 +1,58 @@
 # Eclipse Ditto Configuration
 
-This directory contains configuration files for Eclipse Ditto digital twin platform integration with DigitalEgiz.
+Official Eclipse Ditto deployment integrated with DigitalEgiz platform.
 
-## Deployment
+## Quick Start
 
-Eclipse Ditto is deployed as a **separate Docker Compose stack** to ensure stability and proper cluster formation.
-
-### Initial Setup
-
-1. **Update your `.env` file** with Ditto credentials:
-```bash
-cp .env.example .env
-# Edit .env and set:
-# - DITTO_VERSION=3.5.11
-# - MONGO_INITDB_ROOT_USERNAME=ditto
-# - MONGO_INITDB_ROOT_PASSWORD=your-secure-password
-# - DITTO_DEVOPS_PASSWORD=your-devops-password
-# - DITTO_USER=ditto
-# - DITTO_PASSWORD=your-ditto-password
-# - DOMAIN=your-domain.com
-```
-
-2. **Create htpasswd file** for nginx authentication:
+1. **Create htpasswd file** for authentication:
 ```bash
 cd configuration/ditto
-chmod +x create-htpasswd.sh
 ./create-htpasswd.sh
 cd ../..
 ```
 
-3. **Start Ditto services**:
+2. **Start Ditto**:
 ```bash
 docker-compose -f docker-compose.ditto.yml up -d
 ```
 
-4. **Verify all services are running**:
-```bash
-docker-compose -f docker-compose.ditto.yml ps
-```
+3. **Wait** for cluster formation (1-2 minutes), then access:
+   - **Web UI**: `https://ditto.${DOMAIN}/ui/`
+   - **HTTP API**: `https://ditto.${DOMAIN}/api`
+   - **Status**: `https://ditto.${DOMAIN}/status` (no auth)
 
-Wait 1-2 minutes for all services to fully initialize and form the cluster.
+Login with credentials from `.env` file (`DITTO_USER` / `DITTO_PASSWORD`).
 
-5. **Check logs** if needed:
-```bash
-docker-compose -f docker-compose.ditto.yml logs -f ditto-gateway
-```
+## What's Included
 
-### Accessing Ditto
-
-- **Web UI**: `https://ditto.${DOMAIN}`
-- **HTTP API**: `https://ditto.${DOMAIN}/api`
-- **WebSocket**: `wss://ditto.${DOMAIN}/ws`
-- **DevOps API**: `https://ditto.${DOMAIN}/devops`
-- **Status**: `https://ditto.${DOMAIN}/status` (no auth)
-
-**Login credentials**: Use `DITTO_USER` and `DITTO_PASSWORD` from your `.env` file.
+This is the **official Eclipse Ditto deployment** with minimal modifications:
+- ✅ All 6 Ditto microservices (policies, things, search, connectivity, gateway)
+- ✅ MongoDB database
+- ✅ Ditto UI web interface
+- ✅ Official nginx reverse proxy
+- ✅ Integrated with Traefik for HTTPS/SSL
+- ✅ Connected to DigitalEgiz network for MQTT access
 
 ## Architecture
 
 ```
-Internet → Traefik (HTTPS/SSL) → Ditto Nginx → Ditto Gateway → Ditto Services
-                                             → Ditto UI
+Internet → Traefik (HTTPS) → Ditto Nginx → Ditto Services Cluster
+                                         → Ditto UI
 
-Ditto Services Cluster:
-- ditto-policies      (Authorization)
-- ditto-things        (Digital Twin State)
-- ditto-things-search (Search Engine)
-- ditto-connectivity  (MQTT/External Integrations)
-- ditto-gateway       (API Entry Point)
-- mongodb             (Database)
+Ditto Cluster (internal):
+- mongodb (database)
+- policies (authorization)
+- things (digital twin state)
+- things-search (search engine)
+- connectivity (MQTT/external integrations)
+- gateway (API entry point)
 ```
 
-All Ditto microservices form a cluster using the `ditto-cluster` network alias for internal communication.
+## MQTT Integration with ChirpStack
 
-## MQTT Integration
+Ditto can connect to your existing Mosquitto broker to create digital twins from ChirpStack devices.
 
-### ChirpStack → Ditto Connection
-
-To create a connection between ChirpStack (via Mosquitto MQTT) and Ditto:
-
-#### 1. Create the MQTT Connection
+### Create MQTT Connection
 
 ```bash
 curl -X POST \
@@ -89,53 +62,14 @@ curl -X POST \
   -d @configuration/ditto/mqtt-connection-template.json
 ```
 
-#### 2. Verify Connection Status
+### Verify Connection
 
 ```bash
-curl -X GET \
-  https://ditto.${DOMAIN}/api/2/connections \
+curl https://ditto.${DOMAIN}/api/2/connections \
   -u ditto:your-password
 ```
 
-### Connection Details
-
-**Source (ChirpStack → Ditto):**
-- Topic: `application/+/device/+/event/up`
-- Listens to all ChirpStack uplink messages
-- Automatically creates/updates digital twins based on device data
-
-**Target (Ditto → ChirpStack):**
-- Topic: `application/{{ thing:namespace }}/device/{{ thing:name }}/command/down`
-- Sends commands from digital twins to physical devices
-- Supports twin events and live messages
-
-### Example: Creating a Digital Twin
-
-```bash
-curl -X PUT \
-  https://ditto.${DOMAIN}/api/2/things/org.digitalegiz:sensor-001 \
-  -H 'Content-Type: application/json' \
-  -u ditto:your-password \
-  -d '{
-    "policyId": "org.digitalegiz:sensor-policy",
-    "attributes": {
-      "location": "Office",
-      "type": "temperature-sensor"
-    },
-    "features": {
-      "temperature": {
-        "properties": {
-          "value": 0,
-          "unit": "celsius"
-        }
-      }
-    }
-  }'
-```
-
 ## Managing Ditto
-
-### Start/Stop Services
 
 ```bash
 # Start
@@ -144,37 +78,94 @@ docker-compose -f docker-compose.ditto.yml up -d
 # Stop
 docker-compose -f docker-compose.ditto.yml down
 
+# View logs
+docker-compose -f docker-compose.ditto.yml logs -f gateway
+
 # Restart
 docker-compose -f docker-compose.ditto.yml restart
-
-# View logs
-docker-compose -f docker-compose.ditto.yml logs -f
 ```
 
-### Updating Ditto
+## Configuration
 
-1. Update `DITTO_VERSION` in `.env`
-2. Pull new images and restart:
+### Environment Variables (`.env`)
+
 ```bash
-docker-compose -f docker-compose.ditto.yml pull
-docker-compose -f docker-compose.ditto.yml up -d
+DITTO_VERSION=3.5.11
+DITTO_USER=ditto
+DITTO_PASSWORD=your-password
+DOMAIN=your-domain.com
+```
+
+### Custom Configuration
+
+Ditto services can be configured via `JAVA_TOOL_OPTIONS` environment variables in [docker-compose.ditto.yml](../../docker-compose.ditto.yml).
+
+Example:
+```yaml
+environment:
+  - JAVA_TOOL_OPTIONS=-Dditto.gateway.authentication.devops.password=custom-password
 ```
 
 ## Troubleshooting
 
-### Services not forming cluster
-- Wait 2-3 minutes after startup
+### Services not starting
 - Check logs: `docker-compose -f docker-compose.ditto.yml logs`
-- Ensure all services have `ditto-cluster` network alias
+- Wait 2-3 minutes for cluster formation
+- Verify all containers are running: `docker-compose -f docker-compose.ditto.yml ps`
 
 ### 502 Bad Gateway
-- Verify nginx is running: `docker ps | grep ditto-nginx`
-- Check gateway is healthy: `curl -u ditto:pass https://ditto.${DOMAIN}/status`
-- Review nginx logs: `docker logs digitalegiz-ditto-nginx`
+- Ensure nginx is connected to both networks
+- Check gateway is healthy: `curl https://ditto.${DOMAIN}/status`
+- Verify Traefik can reach nginx: `docker logs digitalegiz-traefik`
 
-### Authentication issues
-- Regenerate htpasswd: `cd configuration/ditto && ./create-htpasswd.sh`
-- Verify credentials in `.env` file
+### UI not loading
+- Clear browser cache
+- Check nginx logs: `docker logs digitalegiz-ditto-nginx`
+- Verify UI container is running: `docker ps | grep ditto-ui`
+
+## API Examples
+
+### Create a Thing (Digital Twin)
+
+```bash
+curl -X PUT \
+  https://ditto.${DOMAIN}/api/2/things/org.digitalegiz:sensor-001 \
+  -H 'Content-Type: application/json' \
+  -u ditto:your-password \
+  -d '{
+    "attributes": {
+      "location": "Office",
+      "manufacturer": "Acme Corp"
+    },
+    "features": {
+      "temperature": {
+        "properties": {
+          "value": 23.5
+        }
+      }
+    }
+  }'
+```
+
+### Query Things
+
+```bash
+curl https://ditto.${DOMAIN}/api/2/things \
+  -u ditto:your-password
+```
+
+### WebSocket Connection
+
+```javascript
+const ws = new WebSocket('wss://ditto.${DOMAIN}/ws/2');
+ws.onopen = () => {
+  // Send auth
+  ws.send(JSON.stringify({
+    type: 'START',
+    protocolVersion: 2
+  }));
+};
+```
 
 ## Further Reading
 
@@ -182,3 +173,4 @@ docker-compose -f docker-compose.ditto.yml up -d
 - [Ditto HTTP API](https://www.eclipse.dev/ditto/httpapi-overview.html)
 - [Ditto Protocol](https://www.eclipse.dev/ditto/protocol-overview.html)
 - [Ditto Connectivity](https://www.eclipse.dev/ditto/connectivity-overview.html)
+- [Official Docker Deployment](https://github.com/eclipse-ditto/ditto/tree/master/deployment/docker)

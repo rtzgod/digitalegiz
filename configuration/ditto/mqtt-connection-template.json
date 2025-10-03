@@ -1,0 +1,48 @@
+{
+  "name": "chirpstack-mqtt-connection",
+  "connectionType": "mqtt",
+  "connectionStatus": "open",
+  "uri": "tcp://mosquitto:1883",
+  "sources": [
+    {
+      "addresses": [
+        "application/+/device/+/event/up"
+      ],
+      "consumerCount": 1,
+      "qos": 1,
+      "authorizationContext": [
+        "nginx:ditto"
+      ],
+      "enforcement": {
+        "input": "{{ header:device-id }}",
+        "filters": [
+          "{{ entity:id }}"
+        ]
+      },
+      "headerMapping": {},
+      "payloadMapping": [
+        "Ditto"
+      ],
+      "replyTarget": {
+        "enabled": false
+      }
+    }
+  ],
+  "targets": [
+    {
+      "address": "application/{{ thing:namespace }}/device/{{ thing:name }}/command/down",
+      "topics": [
+        "_/_/things/twin/events",
+        "_/_/things/live/messages"
+      ],
+      "authorizationContext": [
+        "nginx:ditto"
+      ],
+      "headerMapping": {}
+    }
+  ],
+  "clientCount": 1,
+  "failoverEnabled": true,
+  "validateCertificates": false,
+  "processorPoolSize": 1
+}

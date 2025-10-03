@@ -246,6 +246,8 @@ services:
     environment:
       - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/policies
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx256m
+      - CLUSTER_BOOTSTRAP_ENABLED=false
+      - CLUSTER_NUMBER_OF_SHARDS=1
     depends_on:
       - mongodb
     networks:
@@ -259,6 +261,8 @@ services:
     environment:
       - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/things
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx256m
+      - CLUSTER_BOOTSTRAP_ENABLED=false
+      - CLUSTER_NUMBER_OF_SHARDS=1
     depends_on:
       - mongodb
       - ditto-policies
@@ -273,6 +277,8 @@ services:
     environment:
       - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/searchDB
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
+      - CLUSTER_BOOTSTRAP_ENABLED=false
+      - CLUSTER_NUMBER_OF_SHARDS=1
     depends_on:
       - mongodb
       - ditto-policies
@@ -288,6 +294,8 @@ services:
     environment:
       - MONGO_DB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongodb:27017/connectivity
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
+      - CLUSTER_BOOTSTRAP_ENABLED=false
+      - CLUSTER_NUMBER_OF_SHARDS=1
     depends_on:
       - mongodb
       - ditto-policies
@@ -305,6 +313,8 @@ services:
       - JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
       - DEVOPS_PASSWORD=${DITTO_DEVOPS_PASSWORD}
       - ENABLE_PRE_AUTHENTICATION=true
+      - CLUSTER_BOOTSTRAP_ENABLED=false
+      - CLUSTER_NUMBER_OF_SHARDS=1
     depends_on:
       - ditto-policies
       - ditto-things
@@ -312,23 +322,9 @@ services:
       - ditto-connectivity
     labels:
       - "traefik.enable=true"
-      # HTTP API Router
-      - "traefik.http.routers.ditto-api.rule=Host(`ditto.${DOMAIN}`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.ditto-api.tls=true"
-      - "traefik.http.routers.ditto-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.ditto-api.service=ditto-gateway"
-      # WebSocket Router
-      - "traefik.http.routers.ditto-ws.rule=Host(`ditto.${DOMAIN}`) && PathPrefix(`/ws`)"
-      - "traefik.http.routers.ditto-ws.tls=true"
-      - "traefik.http.routers.ditto-ws.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.ditto-ws.service=ditto-gateway"
-      # DevOps Router
-      - "traefik.http.routers.ditto-devops.rule=Host(`ditto.${DOMAIN}`) && PathPrefix(`/devops`)"
-      - "traefik.http.routers.ditto-devops.tls=true"
-      - "traefik.http.routers.ditto-devops.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.ditto-devops.service=ditto-gateway"
-      - "traefik.http.routers.ditto-devops.middlewares=auth"
-      # Gateway Service
+      - "traefik.http.routers.ditto-gateway.rule=Host(`ditto.${DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`) || PathPrefix(`/devops`))"
+      - "traefik.http.routers.ditto-gateway.tls=true"
+      - "traefik.http.routers.ditto-gateway.tls.certresolver=letsencrypt"
       - "traefik.http.services.ditto-gateway.loadbalancer.server.port=8080"
     networks:
       - digitalegiz-network
@@ -347,6 +343,7 @@ services:
       - "traefik.http.routers.ditto-ui.rule=Host(`ditto.${DOMAIN}`)"
       - "traefik.http.routers.ditto-ui.tls=true"
       - "traefik.http.routers.ditto-ui.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ditto-ui.priority=1"
       - "traefik.http.services.ditto-ui.loadbalancer.server.port=8080"
     networks:
       - digitalegiz-network
